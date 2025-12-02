@@ -8,7 +8,7 @@
 #include <sys/time.h>
 #include <time.h>
 
-#define PORT 8081
+#define PORT 8082
 #define BUFFER_SIZE 1024
 #define SERVER_ADDR "127.0.0.1"  // 接続先IPアドレス
 

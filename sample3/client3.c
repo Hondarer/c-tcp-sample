@@ -8,7 +8,7 @@
 #include <sys/time.h>
 #include <time.h>
 
-#define PORT 8081
+#define PORT 8083
 #define BUFFER_SIZE 1024
 #define SERVER_ADDR "127.0.0.1"  // 接続先IPアドレス
 
@@ -53,6 +53,13 @@ int main() {
     write(sock, "ABCD", 4);
     print_timestamp();
     printf("送信: ABCD\n");
+
+    // サーバーのRST送信を待つために遅延
+    print_timestamp();
+    printf("3秒待機中...\n");
+    sleep(3);
+    print_timestamp();
+    printf("読み取り開始\n");
 
     fd_set readfds;
     struct timeval timeout;

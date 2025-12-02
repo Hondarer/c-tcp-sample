@@ -3,10 +3,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 #include <time.h>
 
-#define PORT 8081
+#define PORT 8082
 #define BUFFER_SIZE 1024
 #define BIND_ADDR "127.0.0.1"  // バインドするIPアドレス
 
@@ -83,6 +84,14 @@ int main() {
             printf("送信: ERROR\n");
         }
     }
+
+    // RST送信による強制切断
+    struct linger so_linger;
+    so_linger.l_onoff = 1;   // lingerを有効化
+    so_linger.l_linger = 0;  // タイムアウト0秒 = RST送信
+    setsockopt(client_fd, SOL_SOCKET, SO_LINGER, &so_linger, sizeof(so_linger));
+    print_timestamp();
+    printf("RST送信による強制切断を実行\n");
 
     close(client_fd);
     close(server_fd);
