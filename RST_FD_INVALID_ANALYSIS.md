@@ -97,6 +97,17 @@ select()が返すerrnoは通常EBADFですが、特定のカーネルバージ�
 - virtio-netなどの仮想化ドライバの動作
 - RSTパケット処理時のソケット状態遷移のタイミング
 
+**技術的背景:**
+ENOENTは「No such file or directory」を意味し、通常はファイル操作で使用されるエラーコードです。しかし、Linuxカーネルの内部実装では、ファイルディスクリプタ関連の操作で以下のような使用例があります：
+
+1. **epoll_ctl()での正式な使用**: `epoll_ctl()`システムコールでは、`EPOLL_CTL_MOD`または`EPOLL_CTL_DEL`操作時に、未登録のファイルディスクリプタに対してENOENTが返されます（[man epoll_ctl(2)](https://man7.org/linux/man-pages/man2/epoll_ctl.2.html)）
+
+2. **Pythonのselectモジュール**: Python 3のselectモジュールでは、「登録されていないファイルディスクリプタを変更しようとすると、errno ENOENTのOSError例外が発生する」と明示的に記載されています（[Python select documentation](https://docs.python.org/3/library/select.html)）
+
+3. **Linuxのselect()実装の非標準動作**: Linux版のselect()はPOSIX.1標準と異なる動作をいくつか持っており（[select(2) man page](https://man.archlinux.org/man/select.2.en)）、タイムアウト値の変更や割り込み時の動作などが他のUNIXシステムと異なります
+
+このため、特にKVM仮想化環境やネットワークスタックの特定の状態では、内部的にepoll相当の機構を使用している可能性があり、ENOENTが返されるケースがあると考えられます。
+
 ---
 
 ## RSTパケットとFD無効化
@@ -1146,6 +1157,48 @@ T3 (35.456): クライアントがselect()呼び出し
 - `man 7 socket`
 - `man tcpdump`
 - `man strace`
+
+### ENOENT エラーに関する参考資料
+
+本レポートで扱っているENOENTエラーは、標準的なPOSIX仕様のselect()では定義されていない非標準的なエラーコードです。以下の資料は、Linuxカーネルにおけるファイルディスクリプタ関連操作でのENOENT使用例を示しています：
+
+#### 公式ドキュメント
+
+- **[epoll_ctl(2) - Linux manual page](https://man7.org/linux/man-pages/man2/epoll_ctl.2.html)**
+  - epoll_ctl()でENOENTが正式なエラーコードとして定義されている事例
+  - 「ENOENT: fd is not registered with this epoll instance」と明記
+
+- **[select(2) - Arch Linux manual pages](https://man.archlinux.org/man/select.2.en)**
+  - Linux版select()の非標準動作についての説明
+  - POSIX.1標準との違いが記載されている
+
+- **[Python select module documentation](https://docs.python.org/3/library/select.html)**
+  - Pythonのselectモジュールで「登録されていないファイルディスクリプタを変更しようとするとENOENTが発生する」と明示
+
+- **[errno(3) - Linux manual page](https://man7.org/linux/man-pages/man3/errno.3.html)**
+  - Linuxにおけるerrno実装の詳細
+  - エラー番号がアーキテクチャやUNIXシステム間で異なることの説明
+
+#### 技術記事・解説
+
+- **[Async IO on Linux: select, poll, and epoll](https://jvns.ca/blog/2017/06/03/async-io-on-linux--select--poll--and-epoll/)**
+  - select、poll、epollの違いについての解説
+  - Linuxのイベント多重化メカニズムの実装差異
+
+- **[Linux System Calls and errno](https://stackoverflow.com/questions/37167141/linux-syscalls-and-errno)**
+  - Linuxシステムコールとerrnoの関係についての議論
+  - 実装依存のエラーコードについての説明
+
+- **[Testing if a file descriptor is valid](https://unix.stackexchange.com/questions/206786/testing-if-a-file-descriptor-is-valid)**
+  - ファイルディスクリプタの有効性チェック方法
+  - /dev/fd やfcntlを使った検証手法
+
+#### 実装差異に関する情報
+
+- **[System call error handling differences](http://osr600doc.xinuos.com/en/SDK_sysprog/SCL_SysCallErrHdl.html)**
+  - UNIXシステム間でのシステムコールエラー処理の違い
+
+これらの資料から、select()でENOENTが返される現象は非標準的ではあるものの、Linuxカーネルの内部実装（特に仮想化環境やネットワークスタック）では、epoll相当の機構を経由することで発生し得ることが示唆されます。
 
 ### 関連技術
 
